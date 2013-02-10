@@ -138,16 +138,16 @@ RestartApacheUser() {
 
 case "$1" in
 	start)
-		POP3FetchControl -1
 		if [ ! -f "${WebMailEnabled}" ]; then
 			exit 1
 		fi
-	    StartDaemons
-	    RestartApacheUser
+		StartDaemons
+		POP3FetchControl -1
+		RestartApacheUser
 		
 		;;
 	stop)
-		POP3FetchControl -2
+		killall fetchmail
 		if [ -f "${WebMailEnabled}" ]; then
 			exit 0
 		fi

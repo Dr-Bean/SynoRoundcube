@@ -37,6 +37,9 @@ if [ $OLDVERSION -le 46 -a $NEWVERSION -ge 47 ]; then
 	fi
 	chmod 1733 /var/spool/postfix/maildrop
 fi
+if [ $OLDVERSION -eq 47 -a $NEWVERSION -ge 48 ]; then
+	/usr/syno/pgsql/bin/psql -U roundcube roundcubemail -c "UPDATE users_type SET account_type='local' WHERE account_type=''" 2>&1
+fi
 
 /bin/grep -Ev "rcmail_config.*extmailallow|rcmail_config.*extmailperiod" ${WebMailConf} > /tmp/MailStation.$$
 /bin/cat /tmp/MailStation.restore >> /tmp/MailStation.$$
