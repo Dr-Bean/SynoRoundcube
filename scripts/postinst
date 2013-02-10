@@ -1,0 +1,21 @@
+#!/bin/sh
+
+if [ -f "/tmp/MailStation.upgrade" ]; then
+	exit 0
+fi
+
+su -l admin -c "/usr/syno/pgsql/bin/createuser -SDR roundcube"
+su -l admin -c "/usr/syno/pgsql/bin/createdb -E SQL_ASCII -O roundcube roundcubemail"
+INIT_SQL="/var/packages/MailStation/scripts/postgres.initial.sql"
+/usr/syno/pgsql/bin/psql -U roundcube roundcubemail < ${INIT_SQL}
+
+if [ $SYNOPKG_DSM_VERSION_BUILD -lt 2500 ]; then
+	IMAP_isEnabled=`/bin/get_key_value /etc/synoinfo.conf imap_enabled`
+	if [ "x$IMAP_isEnabled" != "xyes" ]; then
+		echo "imap_enabled=\"yes\"" >> /etc/synoinfo.conf
+		/usr/syno/etc/rc.d/S89mailserv.sh restart
+	fi
+fi
+
+
+exit 0

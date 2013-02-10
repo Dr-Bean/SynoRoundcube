@@ -1,0 +1,182 @@
+#!/bin/sh
+VOLUME=`/usr/bin/readlink /var/services/homes | /usr/bin/cut -d'/' -f2`
+SPOOL_POSTFIX=/var/spool/postfix
+MAILSERVER_POSTFIX=/${VOLUME}/@postfix
+
+WebMailEnabled="/var/packages/MailStation/enabled"
+WebMailDir="/var/packages/MailStation/target"
+WebmailDesktop="/usr/syno/synoman/webman/3rdparty/MailStation"
+WebMailPostfix=${WebMailDir}/postfix
+WebMailExt=${WebMailDir}/roundcubemail/ext
+WebMailConf=${WebMailDir}/roundcubemail/config/main.inc.php
+UIStringDir="/var/packages/MailStation/target/ui/texts"
+DSM_INDEX_ADD="/usr/syno/bin/pkgindexer_add"
+DSM_INDEX_DEL="/usr/syno/bin/pkgindexer_del"
+
+ApacheConf="/usr/syno/apache/conf/httpd.conf"
+
+FetchBin="/usr/syno/bin/synofetch"
+
+popusers=`/usr/bin/find ${WebMailExt} -name "*_fetch" | /usr/bin/cut -d'/' -f8 |/usr/bin/cut -d'_' -f1`
+
+GenerateMessage() {
+	local key=$1
+	case $SYNOPKG_DSM_LANGUAGE in
+		chs | cht |csy | dan | enu | fre | ger | hun | ita | jpn | krn | nld | nor | plk| ptb | ptg | rus | spn | sve | trk)
+			echo $(sed -n '/^\[app\]/,/^'$key'/s/'$key'.*=.*"\(.*\)"/\1/p' $UIStringDir/$SYNOPKG_DSM_LANGUAGE/strings) > $SYNOPKG_TEMP_LOGFILE
+			;;
+		* )
+			echo "This package requires you to enable Mail Server." > $SYNOPKG_TEMP_LOGFILE
+			;;
+	esac
+}
+
+RegenConf() {
+	
+	WebmailConf="${WebMailDir}/roundcubemail/config/main.inc.php"
+	if [ $SYNOPKG_DSM_VERSION_BUILD -gt 2500 ]; then
+		MailStationHostname=`/bin/get_key_value /var/packages/MailServer/etc/mailserver.conf smtp_hostname`
+		WebmailSMTP=`/bin/get_key_value /var/packages/MailServer/etc/mailserver.conf smtp_hostname`
+	else
+		MailStationHostname=`/bin/get_key_value /etc/synoinfo.conf mailstation_hostname`
+		WebmailSMTP=`/bin/get_key_value /etc/synoinfo.conf webmail_smtp_server`
+	fi
+
+    if [ -z "$WebmailSMTP" ]; then
+        SMTP_SERVER="localhost"
+        SMTP_PORT="25"
+    else
+        SMTP_SERVER=`echo ${WebmailSMTP} | cut -d':' -f1`
+        SMTP_PORT=`echo ${WebmailSMTP} | cut -d':' -f2`
+        if [ "${SMTP_PORT}" = "${WebmailSMTP}" ]; then
+            SMTP_PORT="25"
+        fi
+    fi
+	if [ -z "$MailStationHostname" ]; then
+		MailStationHostname="localhost"
+	fi
+
+	sed "/^\$rcmail_config\['mail_domain'\]/c\\\$rcmail_config['mail_domain'] = '${MailStationHostname}';" ${WebmailConf} > /tmp/tempinfo
+	sed "/^\$rcmail_config\['smtp_server'\]/c\\\$rcmail_config['smtp_server'] = '${SMTP_SERVER}';" /tmp/tempinfo > /tmp/tempinfo.$$
+	sed "/^\$rcmail_config\['smtp_port'\]/c\\\$rcmail_config['smtp_port'] = ${SMTP_PORT};" /tmp/tempinfo.$$ > /tmp/tempinfo
+	/bin/mv /tmp/tempinfo ${WebmailConf}
+    /bin/chown -R nobody:nobody ${WebmailConf}
+}
+
+CheckEnv() {
+	if [ $SYNOPKG_DSM_VERSION_BUILD -gt 2500 ]; then
+		if [ ! -f "/var/packages/MailServer/enabled" ]; then
+			GenerateMessage "require_service"
+			exit 1;
+		fi
+	fi
+
+	if [ ! -d ${MAILSERVER_POSTFIX} ]; then
+		rm -rf ${MAILSERVER_POSTFIX} 2>/dev/null
+		cp -a /var.defaults/spool/postfix ${MAILSERVER_POSTFIX}
+		ln -s ${MAILSERVER_POSTFIX} ${SPOOL_POSTFIX} 
+	fi
+	if [ ! -L ${SPOOL_POSTFIX} ]; then
+		rm -rf ${SPOOL_POSTFIX} 2>/dev/null
+		ln -s ${MAILSERVER_POSTFIX} ${SPOOL_POSTFIX}
+	fi
+	rm -rf ${WebMailPostfix} 2>/dev/null
+	ln -s ${MAILSERVER_POSTFIX} ${WebMailPostfix}
+}
+
+POP3FetchControl(){
+	POP3Fetch_enabled=`grep -E "rcmail_config.*extmailallow" ${WebMailConf} | cut -d ' ' -f3`
+	if [ "$POP3Fetch_enabled" != "true;" ]; then
+		return
+	fi
+	for popusr in $popusers
+	do
+		if [ -e ${WebMailExt}/${popusr}_fetch ]; then
+			${FetchBin} ${popusr} $1
+		fi
+	done
+
+}
+
+StartDaemons() {
+
+	CheckEnv
+	RegenConf
+
+	cp -a ${WebMailDir}/bin/synofetch ${FetchBin}
+
+	rm -f $WebmailDesktop
+	if [ -n "$SYNOPKG_DSM_VERSION_MAJOR" -a $SYNOPKG_DSM_VERSION_MAJOR -ge 4 ]; then
+		ln -sf ${WebMailDir}/ui $WebmailDesktop
+		${DSM_INDEX_ADD} ${WebMailDir}/ui/index.conf
+	else
+		ln -sf ${WebMailDir}/desktop $WebmailDesktop
+	fi
+
+}
+
+StopDaemons() {
+	if [ -n "$SYNOPKG_DSM_VERSION_MAJOR" -a $SYNOPKG_DSM_VERSION_MAJOR -ge 4 ]; then
+		${DSM_INDEX_DEL} ${WebMailDir}/ui/index.conf
+	fi
+
+	rm -f $WebmailDesktop
+}
+
+RestartApacheUser() {
+	ServiceTool="/usr/syno/bin/servicetool"
+	ApacheUserScript="/usr/syno/etc/rc.d/S97apache-user.sh"
+	if [ -e "$ServiceTool" ]; then
+		$ServiceTool --restart webservice > /dev/null 2>&1
+		if [ "0" != "$?" ]; then
+			$ApacheUserScript restart > /dev/null 2>&1
+		fi
+	else
+		$ApacheUserScript restart > /dev/null 2>&1
+	fi
+}
+
+case "$1" in
+	start)
+		POP3FetchControl -1
+		if [ ! -f "${WebMailEnabled}" ]; then
+			exit 1
+		fi
+	    StartDaemons
+	    RestartApacheUser
+		
+		;;
+	stop)
+		POP3FetchControl -2
+		if [ -f "${WebMailEnabled}" ]; then
+			exit 0
+		fi
+		/bin/grep  $WebMailDir $ApacheConf > /dev/null 2>&1
+		if [ $? = 0 ]; then
+	    	StopDaemons
+	    	RestartApacheUser
+		fi
+
+		;;
+	restart)
+		StopDaemons
+		sleep 1
+		StartDaemons
+		;;
+	status)
+		if [ -f "${WebMailEnabled}" ]; then
+			exit 0
+		fi
+		exit 1
+		;;
+	log) 
+		echo ""
+		;;  
+	*)
+		echo "Usage: $0 {start|stop|restart|status}" >&2
+		exit 1
+		;;
+esac
+
+exit 0
+

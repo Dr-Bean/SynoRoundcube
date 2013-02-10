@@ -1,0 +1,31 @@
+#!/bin/sh
+
+VERSION=`/bin/get_key_value /etc.defaults/VERSION buildnumber`
+WebMailDir="/var/packages/MailStation/target"
+WebMailExt=${WebMailDir}/roundcubemail/ext
+WebMailConf=${WebMailDir}/roundcubemail/config/main.inc.php
+if [ $VERSION -lt 1527 ]; then
+	echo "The failed installation is due to the old-of-date firmware version." > $SYNOPKG_TEMP_LOGFILE
+	echo "Please update to the latest firmware." >> $SYNOPKG_TEMP_LOGFILE
+	exit 1
+fi
+
+OLDVERSION=`grep ^version /var/packages/MailStation/INFO | cut -d'"' -f2 | cut -d'-' -f2`
+
+if [ $OLDVERSION -lt 16 ]; then
+	echo "The failed installation is due to the old-of-date package version." > $SYNOPKG_TEMP_LOGFILE
+	echo "Please remove this package and re-install the latest one." >> $SYNOPKG_TEMP_LOGFILE
+	exit 1
+fi
+
+echo $OLDVERSION > /tmp/MailStation.upgrade
+
+grep -E "rcmail_config.*extmailallow|rcmail_config.*extmailperiod" $WebMailConf > /tmp/MailStation.restore
+PKG_VOL_TMP="/`/usr/bin/readlink /var/services/homes | /usr/bin/cut -d'/' -f2`/@tmp"
+mkdir -p $PKG_VOL_TMP
+
+mkdir -p /tmp/MailStation
+/bin/cp -a ${WebMailExt} /tmp/MailStation
+/bin/rm -rf /tmp/MailStation/ext/procmailrc /tmp/MailStation/ext/fetchmailrc
+
+exit 0

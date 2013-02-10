@@ -1,0 +1,13 @@
+#!/bin/sh
+
+if [ -f "/tmp/MailStation.upgrade" ]; then
+	exit 0
+fi
+
+su -l admin -c "/usr/syno/pgsql/bin/dropdb roundcubemail"
+su -l admin -c "/usr/syno/pgsql/bin/dropuser roundcube"
+kill `cat /var/services/homes/*/.Maildir/fetchmail.pid`
+
+rm -f /usr/syno/synoman/webman/3rdparty/MailStation
+
+exit 0

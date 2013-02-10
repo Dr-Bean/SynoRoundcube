@@ -1,0 +1,61 @@
+#!/bin/sh
+
+PKG_VOL_TMP="/`/usr/bin/readlink /var/services/homes | /usr/bin/cut -d'/' -f2`/@tmp"
+SYS_VOL="/`/usr/bin/readlink /var/services/homes | /usr/bin/cut -d'/' -f2`"
+
+mailstation=/usr/syno/mailstation
+WebMailDir="/var/packages/MailStation/target"
+WebMailExt=${WebMailDir}/roundcubemail/ext
+WebMailConf=${WebMailDir}/roundcubemail/config/main.inc.php
+
+OLDVERSION=`cat /tmp/MailStation.upgrade`
+NEWVERSION=`grep ^version /var/packages/MailStation/INFO | cut -d'"' -f2 | cut -d'-' -f2`
+echo Upgrade from version ${OLDVERSION} to version ${NEWVERSION} >> ${WebMailDir}/roundcubemail/logs/upgrade
+if [ $OLDVERSION -le 16 -a $NEWVERSION -ge 17 ]; then
+	UPGRADE_SQL="/var/packages/MailStation/scripts/postgres.update.sql"
+	if [ -f ${UPGRADE_SQL} ]; then
+		/usr/syno/pgsql/bin/psql -U roundcube roundcubemail < ${UPGRADE_SQL} >> ${WebMailDir}/roundcubemail/logs/upgrade 2>&1
+	fi
+	chmod 1733 /var/spool/postfix/maildrop
+fi
+
+if [ $OLDVERSION -eq 17 -a $NEWVERSION -eq 18 ]; then
+	find /var/spool/postfix/*/* -type d | xargs chown -R postfix:postfix
+fi
+
+if [ $OLDVERSION -le 18 -a $NEWVERSION -ge 19 ]; then
+	UPGRADE_SQL="/var/packages/MailStation/scripts/postgres.syno.update.sql"
+	if [ -f ${UPGRADE_SQL} ]; then
+		/usr/syno/pgsql/bin/psql -U roundcube roundcubemail < ${UPGRADE_SQL} >> ${WebMailDir}/roundcubemail/logs/upgrade 2>&1
+	fi
+	chmod 1733 /var/spool/postfix/maildrop
+fi
+if [ $OLDVERSION -le 46 -a $NEWVERSION -ge 47 ]; then
+	UPGRADE_SQL="/var/packages/MailStation/scripts/postgres.syno.domain.update.sql"
+	if [ -f ${UPGRADE_SQL} ]; then
+		/usr/syno/pgsql/bin/psql -U roundcube roundcubemail < ${UPGRADE_SQL} >> ${WebMailDir}/roundcubemail/logs/upgrade 2>&1
+	fi
+	chmod 1733 /var/spool/postfix/maildrop
+fi
+
+/bin/grep -Ev "rcmail_config.*extmailallow|rcmail_config.*extmailperiod" ${WebMailConf} > /tmp/MailStation.$$
+/bin/cat /tmp/MailStation.restore >> /tmp/MailStation.$$
+/bin/mv /tmp/MailStation.$$ ${WebMailConf}
+
+
+rm -rf /var/packages/MailStation/target/postfix  
+rm -rf /var/spool/postfix
+rm -rf ${PKG_VOL_TMP}/postfix
+ln -s ${SYS_VOL}/@postfix /var/packages/MailStation/target/postfix 
+ln -s ${SYS_VOL}/@postfix /var/spool/postfix 
+rm -f /tmp/MailStation.upgrade
+rm -f /tmp/MailStation.restore
+
+if [ -d /tmp/MailStation/ext ]; then
+	/bin/cp -a /tmp/MailStation/ext ${WebMailDir}/roundcubemail
+	/bin/rm -rf /tmp/MailStation/ext > /dev/null 2>&1
+fi
+
+sed -i 's/\/usr\/syno\/mailstation\/sbin\/procmail/\/var\/packages\/MailStation\/target\/bin\/procmail/g' ${WebMailDir}/roundcubemail/ext/*_fetch
+
+exit 0

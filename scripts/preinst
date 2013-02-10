@@ -1,0 +1,73 @@
+#!/bin/sh
+if [ $SYNOPKG_DSM_VERSION_BUILD -gt 2500 -a ! -f "/var/packages/MailServer/INFO" ]; then
+	case $SYNOPKG_DSM_LANGUAGE in
+			chs)
+			echo "在安装此套件前，请先安装 [Mail Server]。" > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		cht)
+			echo "在安裝此套件前，請先安裝 [Mail Server]。" > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		csy)
+			echo "Před instalací tohoto balíčku nainstalujte „Mail Server“." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		dan)
+			echo "Installer Mail Server, før du installerer denne pakke." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		enu)
+			echo "Please install Mail Server before installing this package." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		fre)
+			echo "Installez « Mail Server » avant d’installer ce package." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		ger)
+			echo "Bitte installieren Sie Mail Server, bevor Sie dieses Paket installieren." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		hun)
+			echo "A csomag telepítése előtt telepítenie kell a következőt: Mail Server." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		ita)
+			echo "Installare Mail Server prima del pacchetto." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		jpn)
+			echo "このパッケージをインストールする前に「Mail Server」をインストールしてください。" > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		krn)
+			echo "이 패키지를 설치하기 전에 Mail Server을(를) 설치하십시오." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		nld)
+			echo "Installeer Mail Server voor u dit pakket installeert." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		nor)
+			echo "Installer Mail Server før du installerer denne pakken." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		plk)
+			echo "Przed instalacją tego pakietu zainstaluj składnik „Mail Server”." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		ptb)
+			echo "Instale Mail Server antes de instalar este pacote." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		ptg)
+			echo "Instale o Mail Server antes de instalar este pacote." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		rus)
+			echo "Установите Mail Server перед установкой данного пакета." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		spn)
+			echo "Instale Mail Server antes de instalar este paquete." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		sve)
+			echo "Installera Mail Server innan du installerar detta paket." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		trk)
+			echo "Lütfen bu paketi yüklemeden önce Mail Server yüklemesini yapın." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+		*)
+			echo "Please install Mail Server before installing this package." > $SYNOPKG_TEMP_LOGFILE 
+		;;
+	esac
+	if [ -f /tmp/MailStation.upgrade ]; then
+		/bin/rm /tmp/MailStation.upgrade
+	fi
+	exit 1;
+fi
+exit 0
